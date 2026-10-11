@@ -29,21 +29,25 @@ def test_logging(logger: tb.SummaryWriter):
             dummy_train_loss = 0.9 ** (epoch + iteration / 20.0)
             dummy_train_accuracy = epoch / 10.0 + torch.randn(10)
 
-            # TODO: log train_loss
+            logger.add_scalar("train_loss", dummy_train_loss, global_step)
+            metrics["train_acc"].append(dummy_train_accuracy.mean().item())
+
             # TODO: save additional metrics to be averaged
 
             global_step += 1
 
-        # TODO: log average train_accuracy
+        
+        logger.add_scalar("train_accuracy", torch.as_tensor(metrics["train_acc"]).mean().item(), global_step)
 
         # example validation loop
         torch.manual_seed(epoch)
         for _ in range(10):
             dummy_validation_accuracy = epoch / 10.0 + torch.randn(10)
 
-            # TODO: save additional metrics to be averaged
+            metrics["val_acc"].append(dummy_validation_accuracy.mean().item())
 
-        # TODO: log average val_accuracy
+
+        logger.add_scalar("val_accuracy", torch.as_tensor(metrics["val_acc"]).mean().item(), global_step)
 
 
 if __name__ == "__main__":
