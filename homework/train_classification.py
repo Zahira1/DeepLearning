@@ -39,7 +39,7 @@ def train(num_epochs=30, lr=1e-3, batch_size=128):
             for img, label in val_data:
                 img, label = img.to(device), label.to(device)
                 pred = model.predict(img)
-                metric.update(pred, label)
+                metric.add(pred, label)
 
         val_acc = metric.compute()["accuracy"]
         print(f"Epoch {epoch+1}/{num_epochs}  val_acc={val_acc:.3f}")
