@@ -29,7 +29,7 @@ class Classifier(nn.Module):
 
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.fc    = nn.Linear(64 * 8 * 8, num_classes)
+        self.fc    = nn.Linear(64 * 16 * 16, num_classes)
         self.pool = nn.MaxPool2d(2, 2)
 
         
