@@ -13,6 +13,7 @@ class Classifier(nn.Module):
         self,
         in_channels: int = 3,
         num_classes: int = 6,
+        
     ):
         """
         A convolutional network for image classification.
@@ -26,8 +27,12 @@ class Classifier(nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # TODO: implement
-        pass
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.fc    = nn.Linear(64 * 8 * 8, num_classes)
+        self.pool = nn.MaxPool2d(2, 2)
+
+        
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -40,10 +45,15 @@ class Classifier(nn.Module):
         # optional: normalizes the input
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
-        # TODO: replace with actual forward pass
-        logits = torch.randn(x.size(0), 6)
-
+        # replace with actual forward pass
+        z = torch.relu(self.conv1(z))
+        z = self.pool(z)
+        z = torch.relu(self.conv2(z))
+        z = self.pool(z)
+        z = z.view(z.size(0), -1)
+        logits = self.fc(z)
         return logits
+
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         """
