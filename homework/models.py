@@ -69,6 +69,36 @@ class Classifier(nn.Module):
         """
         return self(x).argmax(dim=1)
 
+class DownBlock(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=2, padding=1),   # halves H, W
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(),
+            nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=1),  # same size, more depth
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class UpBlock(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.ConvTranspose2d(in_ch, out_ch, kernel_size=4, stride=2, padding=1),  # doubles H, W
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(),
+            nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(),
+        )
+
+    def forward(self, x):
+        return self.net(x)
 
 class Detector(torch.nn.Module):
     def __init__(
@@ -88,23 +118,20 @@ class Detector(torch.nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # Encoder (down)
-        self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=3, padding=1, stride=2)
-        self.bn1   = nn.BatchNorm2d(16)
-
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1, stride=2)
-        self.bn2   = nn.BatchNorm2d(32)
+                # Encoder (down)
+        self.down1 = DownBlock(in_channels, 32)   # 96x128 -> 48x64
+        self.down2 = DownBlock(32, 64)            # 48x64  -> 24x32
+        self.down3 = DownBlock(64, 128)           # 24x32  -> 12x16
 
         # Decoder (up)
-        self.up1 = nn.ConvTranspose2d(32, 16, kernel_size=4, padding=1, stride=2)
-        self.bn3 = nn.BatchNorm2d(16)
-
-        self.up2 = nn.ConvTranspose2d(16, 16, kernel_size=4, padding=1, stride=2)
-        self.bn4 = nn.BatchNorm2d(16)
+        self.up1 = UpBlock(128, 64)               # 12x16  -> 24x32
+        self.up2 = UpBlock(64, 32)                # 24x32  -> 48x64
+        self.up3 = UpBlock(32, 32)                # 48x64  -> 96x128
 
         # Output heads
-        self.seg_head   = nn.Conv2d(16, num_classes, kernel_size=1)  # segmentation
-        self.depth_head = nn.Conv2d(16, 1, kernel_size=1)            # depth
+        self.seg_head   = nn.Conv2d(32, num_classes, kernel_size=1)
+        self.depth_head = nn.Conv2d(32, 1, kernel_size=1)
+            # depth
 
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -124,10 +151,14 @@ class Detector(torch.nn.Module):
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
         
-        z = torch.relu(self.bn1(self.conv1(z)))
-        z = torch.relu(self.bn2(self.conv2(z)))
-        z = torch.relu(self.bn3(self.up1(z)))
-        z = torch.relu(self.bn4(self.up2(z)))
+        d1 = self.down1(z)
+        d2 = self.down2(d1)
+        d3 = self.down3(d2)
+
+        u = self.up1(d3) + d2
+        u = self.up2(u)  + d1
+        z = self.up3(u)
+
 
         logits = self.seg_head(z)
         raw_depth = self.depth_head(z).squeeze(1)
